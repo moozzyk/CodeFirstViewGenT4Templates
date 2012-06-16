@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Vsix xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" Version="1.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2010">
+  <Identifier Id="CodeFirstViewGenT4TemplateVBNet.PawelKadluczka.3a1e9824-ac63-4393-b57f-9ec042c20c4a">
+    <Name>EF CodeFirst View Generation T4 Template for VB</Name>
+    <Author>Pawel Kadluczka</Author>
+    <Version>1.0</Version>
+    <Description xml:space="preserve">VB.NET T4 template for creating pre-generated views for applications using EF CodeFirst</Description>
+    <Locale>1033</Locale>
+    <License>ms-pl.txt</License>
+    <SupportedProducts>
+      <VisualStudio Version="10.0">
+        <Edition>VBExpress</Edition>
+        <Edition>VWDExpress</Edition>
+        <Edition>Pro</Edition>
+      </VisualStudio>
+      <VisualStudio Version="11.0">
+        <Edition>VBExpress</Edition>
+        <Edition>VWDExpress</Edition>
+        <Edition>Pro</Edition>
+      </VisualStudio>
+    </SupportedProducts>
+    <SupportedFrameworkRuntimeEdition MinVersion="4.0" MaxVersion="4.0" />
+  </Identifier>
+  <References />
+  <Content>
+    <ItemTemplate>T4</ItemTemplate>
+  </Content>
+</Vsix>

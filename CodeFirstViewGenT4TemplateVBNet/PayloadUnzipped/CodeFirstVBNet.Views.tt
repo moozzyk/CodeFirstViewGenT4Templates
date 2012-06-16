@@ -1,0 +1,151 @@
+﻿<#
+' Copyright (c) Pawel Kadluczka. All rights reserved.
+'
+' AS IS, NO WARRANTY, USE ON YOUR OWN RISK
+'
+' T4 template for creating pre-generated views for Entity Framework Code First application
+'
+' Usage: 
+' 1. Add this template to your project
+' 2. Rename this template so that its name contains the name of your DbContext derived class (e.g. MyContext.Views.tt)
+' 3. Right-click the template file in the Solution Explorer and select "Run Custom Tool"
+' 4. If you have more than one DbContext derived class in your project you need to add a separate template for each
+'    DbContext derived class you want to create pre-generated views for. 
+#>
+<#@ template debug="false" hostspecific="true" language="VB" #>
+<#@ output extension=".vb" #>
+<#@ assembly name="$(TargetPath)"#>
+<#@ assembly name="$(ProjectDir)$(OutDir)EntityFramework.dll"#>
+<#@ import namespace="System.IO" #>
+<#@ import namespace="System.Collections.Generic" #>
+<#@ import namespace="System.Data.Entity" #>
+<#@ import namespace="System.Data.Entity.Design" #>
+<#@ import namespace="System.Data.Entity.Infrastructure" #>
+<#@ import namespace="System.Data.Metadata.Edm" #>
+<#@ import namespace="System.Data.Mapping" #>
+<#@ import namespace="System.Linq" #>
+<#@ import namespace="System.Reflection" #>
+<#@ import namespace="System.Xml" #>
+<#@ import namespace="System.Xml.Linq" #>
+<#@ assembly name="System.Core" #>
+<#@ assembly name="System.Data" #>
+<#@ assembly name="System.Data.Entity" #>
+<#@ assembly name="System.Data.Entity.Design" #>
+<#@ assembly name="System.Xml" #>
+<#@ assembly name="System.Xml.Linq" #>
+<#@ assembly name="EnvDTE" #>
+<# 
+	Dim configFilePath As String = GetConfigFilePath()
+	If Not configFilePath Is Nothing Then
+		AppDomain.CurrentDomain.SetData("APP_CONFIG_FILE", configFilePath)
+	End If
+
+	Dim contextTypeName As String = GetContextTypeName()
+	WriteLine(GenerateViews(contextTypeName))
+#>
+<#+
+	Private Function GenerateViews(ByVal contextTypeName As String) As String
+		' Get Edmx for the context
+		Dim edmx As XDocument= GetEdmx(GetContextType(contextTypeName))
+
+		' extract csdl, ssdl and msl artifacts from the Edmx
+		Dim csdlReader, ssdlReader, mslReader As XmlReader
+		SplitEdmx(edmx, csdlReader, ssdlReader, mslReader)
+
+		' Initialize item collections
+		Dim edmItemCollection As EdmItemCollection = New EdmItemCollection(New XmlReader() { csdlReader })
+		Dim storeItemCollection As StoreItemCollection = New StoreItemCollection(New XmlReader() { ssdlReader })
+		Dim mappingItemCollection As StorageMappingItemCollection = New StorageMappingItemCollection(edmItemCollection, storeItemCollection, new XmlReader() { mslReader })
+
+		' Initialize the view generator to generate views in VB.NET
+		Dim viewGenerator As EntityViewGenerator = new EntityViewGenerator() With { .LanguageOption = LanguageOption.GenerateVBCode }
+
+		' generate views
+		Using memoryStream As MemoryStream = new MemoryStream()
+			Dim writer As StreamWriter = New StreamWriter(memoryStream)			
+			Dim errors As IList(Of EdmSchemaError) = viewGenerator.GenerateViews(mappingItemCollection, writer)
+
+			If errors.Any() Then			
+				For Each _error As EdmSchemaError in errors
+					Error(_error.Message)
+				Next
+				Return String.Empty
+			End If
+
+			memoryStream.Position = 0
+			Dim reader As StreamReader = new StreamReader(memoryStream)
+			Return reader.ReadToEnd()
+		End Using
+
+	End Function
+
+    Private Function GetContextType(ByVal contextTypeName As String) As Type
+
+        For Each _assembly As Assembly In AppDomain.CurrentDomain.GetAssemblies().Where(Function(a) Not a.IsDynamic)
+            Dim contextType As Type = 
+				_assembly _
+                .GetTypes() _
+                .AsEnumerable() _
+                .FirstOrDefault(Function(t) t.Name = contextTypeName AndAlso GetType(DbContext).IsAssignableFrom(t))
+
+            If Not contextType Is Nothing Then
+                Return contextType
+            End If
+        Next
+
+        Throw New InvalidOperationException(
+         "Could not find the context type. Make sure the template name is using convention '{ContextTypeName}.Views.tt'")
+    End Function
+
+	Private Function GetContextTypeName() As String
+		Dim templateFileName As String = Path.GetFileNameWithoutExtension(Host.TemplateFile)
+		Dim dotPosition As Integer = templateFileName.IndexOf("."c)
+
+		If dotPosition <= 0 Then
+			Throw New InvalidOperationException(
+				string.Format("The template name '{0}' has an unexpected format.", Host.TemplateFile))
+		End If
+
+		Return templateFileName.Substring(0, dotPosition)
+	End Function
+
+	Private Function GetEdmx(ByVal contextType As Type) As XDocument 
+		Dim ms As MemoryStream = new MemoryStream()
+
+		Using writer As XmlWriter = XmlWriter.Create(ms)
+			EdmxWriter.WriteEdmx(DirectCast(Activator.CreateInstance(contextType), DbContext), writer)
+		End Using
+
+		ms.Position = 0
+		Return XDocument.Load(ms)
+	End Function
+
+	Private Sub SplitEdmx(ByVal edmx As XDocument, ByRef csdlReader As XmlReader, ByRef ssdlReader As XmlReader, ByRef mslReader As XmlReader)
+		' xml namespace agnostic to make it work with any version of Entity Framework
+        Dim edmxNs As XNamespace = edmx.Root.Name.Namespace
+
+        Dim storageModels As XElement = edmx.Descendants(edmxNs + "StorageModels").Single()
+        Dim conceptualModels As XElement = edmx.Descendants(edmxNs + "ConceptualModels").Single()
+        Dim mappings As XElement = edmx.Descendants(edmxNs + "Mappings").Single()
+
+        ssdlReader = storageModels.Elements().Single(Function(e) e.Name.LocalName = "Schema").CreateReader()
+        csdlReader = conceptualModels.Elements().Single(Function(e) e.Name.LocalName = "Schema").CreateReader()
+        mslReader = mappings.Elements().Single(Function(e) e.Name.LocalName = "Mapping").CreateReader()
+	End Sub
+
+	Private Function GetConfigFilePath() As String
+		Dim dte =  CType(Host, IServiceProvider).GetService(GetType(EnvDTE.DTE))  '(EnvDTE.DTE)((IServiceProvider)Host).GetService(typeof(EnvDTE.DTE))
+		Dim project = dte.Solution.FindProjectItem(Host.TemplateFile).ContainingProject
+		Dim configFile = 
+			Enumerable.Cast(Of EnvDTE.ProjectItem)( _
+			project _
+			.ProjectItems) _
+			.FirstOrDefault(Function(i) string.Compare("web.config", i.Name, true) = 0 Or string.Compare("app.config", i.Name, true) = 0)
+
+		If configFile Is Nothing
+			Return Nothing
+		Else
+			Return configFile.FileNames(0)
+		End If
+	End Function
+#>
