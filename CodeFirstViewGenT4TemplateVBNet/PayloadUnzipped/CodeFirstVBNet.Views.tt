@@ -49,7 +49,9 @@
 		Dim edmx As XDocument= GetEdmx(GetContextType(contextTypeName))
 
 		' extract csdl, ssdl and msl artifacts from the Edmx
-		Dim csdlReader, ssdlReader, mslReader As XmlReader
+		Dim csdlReader As XmlReader = Nothing
+		Dim ssdlReader As XmlReader = Nothing
+		Dim mslReader As XmlReader = Nothing
 		SplitEdmx(edmx, csdlReader, ssdlReader, mslReader)
 
 		' Initialize item collections
@@ -63,7 +65,7 @@
 		' generate views
 		Using memoryStream As MemoryStream = new MemoryStream()
 			Dim writer As StreamWriter = New StreamWriter(memoryStream)			
-			Dim errors As IList(Of EdmSchemaError) = viewGenerator.GenerateViews(mappingItemCollection, writer)
+			Dim errors As IList(Of EdmSchemaError) = viewGenerator.GenerateViews(mappingItemCollection, writer, GetEdmxSchemaVersion(edmx))
 
 			If errors.Any() Then			
 				For Each _error As EdmSchemaError in errors
@@ -134,7 +136,7 @@
 	End Sub
 
 	Private Function GetConfigFilePath() As String
-		Dim dte =  CType(Host, IServiceProvider).GetService(GetType(EnvDTE.DTE))  '(EnvDTE.DTE)((IServiceProvider)Host).GetService(typeof(EnvDTE.DTE))
+		Dim dte =  CType(Host, IServiceProvider).GetService(GetType(EnvDTE.DTE))
 		Dim project = dte.Solution.FindProjectItem(Host.TemplateFile).ContainingProject
 		Dim configFile = 
 			Enumerable.Cast(Of EnvDTE.ProjectItem)( _
@@ -147,5 +149,19 @@
 		Else
 			Return configFile.FileNames(0)
 		End If
+	End Function
+
+	Private Function GetEdmxSchemaVersion(edmx As XDocument) As Version	
+		Dim edmxNs = edmx.Root.GetDefaultNamespace()
+
+		If edmxNs = "http://schemas.microsoft.com/ado/2009/11/edmx"
+			Return EntityFrameworkVersions.Version3
+		Else If edmxNs = "http://schemas.microsoft.com/ado/2008/10/edmx"
+			Return EntityFrameworkVersions.Version2
+		End If
+
+		' V1, greater than V3 or non-edmx edmxNs
+		Throw New ArgumentException("Unsupported edmx version")
+	
 	End Function
 #>

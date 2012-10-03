@@ -3,7 +3,7 @@
   <Identifier Id="CodeFirstViewGenT4TemplateVBNet.PawelKadluczka.3a1e9824-ac63-4393-b57f-9ec042c20c4a">
     <Name>EF CodeFirst View Generation T4 Template for VB</Name>
     <Author>Pawel Kadluczka</Author>
-    <Version>1.0</Version>
+    <Version>1.0.1</Version>
     <Description xml:space="preserve">VB.NET T4 template for creating pre-generated views for applications using EF CodeFirst</Description>
     <Locale>1033</Locale>
     <License>ms-pl.txt</License>

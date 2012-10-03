@@ -67,7 +67,7 @@ DbContext derived class you want to create pre-generated views for.
 		{
 			var writer = new StreamWriter(memoryStream);
 			
-			var errors = viewGenerator.GenerateViews(mappingItemCollection, writer).ToList();
+			var errors = viewGenerator.GenerateViews(mappingItemCollection, writer, GetEdmxSchemaVersion(edmx)).ToList();
 
 			if (errors.Any())
 			{
@@ -159,5 +159,22 @@ DbContext derived class you want to create pre-generated views for.
 			.FirstOrDefault(i => string.Compare("web.config", i.Name, true) == 0 || string.Compare("app.config", i.Name, true) == 0);
 
 		return configFile == null ? null : configFile.FileNames[0];
+	}
+
+	private Version GetEdmxSchemaVersion(XDocument edmx)
+	{
+		var edmxNs = edmx.Root.GetDefaultNamespace();
+
+		if (edmxNs == "http://schemas.microsoft.com/ado/2009/11/edmx")
+		{
+			return EntityFrameworkVersions.Version3;
+		}
+		else if (edmxNs == "http://schemas.microsoft.com/ado/2008/10/edmx")
+		{
+			return EntityFrameworkVersions.Version2;
+		}
+
+		// V1, greater than V3 or non-edmx edmxNs
+		throw new ArgumentException("Unsupported edmx version");
 	}
 #>
